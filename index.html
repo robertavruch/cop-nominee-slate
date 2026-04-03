@@ -114,6 +114,33 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .demo-pill{font-size:12px;padding:4px 10px;border-radius:6px;background:var(--surface);border:1px solid var(--border);color:var(--text-secondary)}
 .demo-pill .dp-n{font-weight:700;color:var(--text);margin-right:3px}
 .demo-divider{width:1px;height:20px;background:var(--border)}
+
+.seats-bar{padding:20px 48px 0;max-width:1440px;margin:0 auto}
+.seats-title{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:600;margin-bottom:12px}
+.seats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.seat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden}
+.seat-card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:10px 0 0 10px}
+.seat-card.sc-ai::before{background:var(--cat-ai)}
+.seat-card.sc-audience::before{background:var(--cat-audience)}
+.seat-card.sc-narrative::before{background:var(--cat-narrative)}
+.seat-card.sc-creator::before{background:var(--cat-creator)}
+.seat-card.sc-distribution::before{background:var(--cat-distribution)}
+.seat-card.sc-funder::before{background:var(--cat-funder)}
+.seat-label{font-size:12px;color:var(--text-secondary);margin-bottom:8px;font-weight:500}
+.seat-row{display:flex;align-items:center;gap:8px}
+.seat-dots{display:flex;gap:3px;flex-wrap:wrap}
+.seat-dot{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--border)}
+.seat-dot.filled{border-color:transparent}
+.seat-dot.sc-ai.filled{background:var(--cat-ai)}.seat-dot.sc-audience.filled{background:var(--cat-audience)}.seat-dot.sc-narrative.filled{background:var(--cat-narrative)}.seat-dot.sc-creator.filled{background:var(--cat-creator)}.seat-dot.sc-distribution.filled{background:var(--cat-distribution)}.seat-dot.sc-funder.filled{background:var(--cat-funder)}
+.seat-dot.over{border:1.5px solid transparent;position:relative}
+.seat-dot.over::after{content:'';position:absolute;inset:0;border-radius:50%;border:1.5px dashed}
+.seat-dot.sc-ai.over::after{border-color:var(--cat-ai)}.seat-dot.sc-audience.over::after{border-color:var(--cat-audience)}.seat-dot.sc-narrative.over::after{border-color:var(--cat-narrative)}.seat-dot.sc-creator.over::after{border-color:var(--cat-creator)}.seat-dot.sc-distribution.over::after{border-color:var(--cat-distribution)}.seat-dot.sc-funder.over::after{border-color:var(--cat-funder)}
+.seat-count{font-size:11px;color:var(--text-muted);white-space:nowrap}
+.seat-count .sc-current{font-weight:700;color:var(--text)}
+.seat-status{font-size:10px;margin-top:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+.seat-status.on-target{color:var(--accent)}
+.seat-status.over-target{color:var(--cat-audience)}
+.seat-status.under-target{color:var(--text-muted)}
 </style>
 </head>
 <body>
@@ -121,6 +148,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <div class="filters" id="filters"></div>
 <div class="demo-bar" id="demoBar"></div>
 
+
+<div class="seats-bar">
+  <div class="seats-title">Seat Allocation — Target vs. Current Nominees <span style="font-weight:400;letter-spacing:0;text-transform:none;font-size:11px;color:var(--text-muted);margin-left:6px">(counts include both primary and secondary self-reported categories)</span></div>
+  <div class="seats-grid" id="seatsGrid"></div>
+</div>
 <div class="sec" id="secFormal" style="margin-top:6px"><h2>Submitted Nominations</h2></div>
 <div class="grid" id="gFormal"></div>
 <div class="sec" id="secPending"><h2>Incoming — Nomination Pending</h2></div>
@@ -322,7 +354,52 @@ function renderDemo(){
     </div>
   `;
 }
-renderFilters();renderCards();renderDemo();
+
+function renderSeats(){
+  const targets = [
+    {cat:'AI Domain Expert', k:'ai', lo:3, hi:5},
+    {cat:'Audience & Identity Formation Researcher', k:'audience', lo:2, hi:2},
+    {cat:'Distribution & Systems Operator', k:'distribution', lo:2, hi:3},
+    {cat:'Experimental Narrative Practitioner', k:'narrative', lo:3, hi:3},
+    {cat:'Creator or Creator Organizer', k:'creator', lo:4, hi:5},
+    {cat:'Learning-Oriented Funder', k:'funder', lo:2, hi:2},
+  ];
+  const all = [...D, ...PEND];
+  const grid = document.getElementById('seatsGrid');
+  grid.innerHTML = targets.map(t => {
+    // Count primary category matches
+    const count = all.filter(n => n.cat === t.cat || n.sec === t.cat).length;
+    const maxDots = Math.max(t.hi, count);
+    let dots = '';
+    for(let i = 0; i < maxDots; i++){
+      if(i < count && i < t.hi){
+        dots += `<span class="seat-dot sc-${t.k} filled"></span>`;
+      } else if(i < count){
+        dots += `<span class="seat-dot sc-${t.k} filled over"></span>`;
+      } else {
+        dots += `<span class="seat-dot"></span>`;
+      }
+    }
+    let status, statusClass;
+    if(count >= t.lo && count <= t.hi){
+      status = 'On target'; statusClass = 'on-target';
+    } else if(count > t.hi){
+      status = `+${count - t.hi} over`; statusClass = 'over-target';
+    } else {
+      status = `${t.lo - count} more needed`; statusClass = 'under-target';
+    }
+    const label = ci(t.cat).l;
+    return `<div class="seat-card sc-${t.k}">
+      <div class="seat-label">${label}</div>
+      <div class="seat-row">
+        <div class="seat-dots">${dots}</div>
+        <span class="seat-count"><span class="sc-current">${count}</span> / ${t.lo}${t.hi!==t.lo?'–'+t.hi:''}</span>
+      </div>
+      <div class="seat-status ${statusClass}">${status}</div>
+    </div>`;
+  }).join('');
+}
+renderFilters();renderCards();renderDemo();renderSeats();
 </script>
 </body>
 </html>
